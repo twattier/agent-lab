@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentlab
+  labels:
+    name: agentlab
+    app.kubernetes.io/name: agentlab
+  annotations:
+    description: 'AgentLab namespace for all application resources'

@@ -1,0 +1,270 @@
+version: '3.8'
+
+# Testing environment configuration for AgentLab
+# Isolated test services with test database and Redis instance
+
+networks:
+  agentlab-test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  postgres_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+
+services:
+  postgres-test:
+    image: postgres:15.4
+    container_name: agentlab-postgres-test
+    restart: 'no'
+    environment:
+      POSTGRES_DB: agentlab_test
+      POSTGRES_USER: agentlab_test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8'
+    ports:
+      - '5433:5432' # Different port to avoid conflicts
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d
+      - ./infrastructure/postgres/test-data:/docker-entrypoint-initdb.d/test-data
+    networks:
+      agentlab-test-network:
+        ipv4_address: 172.21.0.10
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U agentlab_test_user -d agentlab_test']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    command: >
+      postgres
+      -c shared_preload_libraries=vector
+      -c max_connections=50
+      -c shared_buffers=64MB
+      -c effective_cache_size=256MB
+      -c maintenance_work_mem=16MB
+      -c fsync=off
+      -c synchronous_commit=off
+      -c checkpoint_segments=32
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+
+  redis-test:
+    image: redis:7.0-alpine
+    container_name: agentlab-redis-test
+    restart: 'no'
+    environment:
+      REDIS_PASSWORD: test_redis_password
+    ports:
+      - '6380:6379' # Different port to avoid conflicts
+    volumes:
+      - redis_test_data:/data
+      - ./infrastructure/redis/redis-test.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      agentlab-test-network:
+        ipv4_address: 172.21.0.11
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass test_redis_password
+
+  api-test:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/api/Dockerfile
+      target: development
+    container_name: agentlab-api-test
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://agentlab_test_user:test_password@postgres-test:5432/agentlab_test
+      REDIS_URL: redis://:test_redis_password@redis-test:6379
+      ENV: test
+      DEBUG: 'true'
+      LOG_LEVEL: warning
+      CLAUDE_API_KEY: test_claude_api_key
+      PYTHONPATH: /app
+      TESTING: 'true'
+    ports:
+      - '8001:8000' # Different port to avoid conflicts
+    volumes:
+      - ./apps/api:/app/api
+      - ./packages:/app/packages
+      - ./tests:/app/tests
+      - ./infrastructure/logs:/app/logs
+    networks:
+      agentlab-test-network:
+        ipv4_address: 172.21.0.13
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: >
+      sh -c "
+      # Wait for database to be ready
+      sleep 5 &&
+      # Run database migrations
+      python -m alembic upgrade head &&
+      # Start the test API server
+      uvicorn api.main:app --host 0.0.0.0 --port 8000 --log-level warning
+      "
+
+  web-test:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/web/Dockerfile
+      target: development
+    container_name: agentlab-web-test
+    restart: 'no'
+    environment:
+      NEXT_PUBLIC_API_URL: http://api-test:8000
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: test_nextauth_secret
+      NODE_ENV: test
+      CI: 'true'
+    ports:
+      - '3001:3000' # Different port to avoid conflicts
+    volumes:
+      - ./apps/web:/app/web
+      - ./packages:/app/packages
+      - ./tests:/app/tests
+    networks:
+      agentlab-test-network:
+        ipv4_address: 172.21.0.14
+    depends_on:
+      api-test:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: >
+      sh -c "
+      # Build the application for testing
+      npm run build --workspace=apps/web &&
+      # Start the test server
+      npm run start --workspace=apps/web
+      "
+
+  # Test runner services
+  api-tests:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/api/Dockerfile
+      target: development
+    container_name: agentlab-api-tests
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://agentlab_test_user:test_password@postgres-test:5432/agentlab_test
+      REDIS_URL: redis://:test_redis_password@redis-test:6379
+      ENV: test
+      DEBUG: 'false'
+      LOG_LEVEL: critical
+      CLAUDE_API_KEY: test_claude_api_key
+      PYTHONPATH: /app
+      TESTING: 'true'
+    volumes:
+      - ./apps/api:/app/api
+      - ./packages:/app/packages
+      - ./tests:/app/tests
+      - ./coverage:/app/coverage
+    networks:
+      - agentlab-test-network
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+      # Wait for services to be ready
+      sleep 10 &&
+      # Run database migrations
+      python -m alembic upgrade head &&
+      # Run tests with coverage
+      pytest tests/api/ -v --cov=api --cov-report=html --cov-report=term-missing --cov-fail-under=80
+      "
+    profiles:
+      - test
+
+  web-tests:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/web/Dockerfile
+      target: development
+    container_name: agentlab-web-tests
+    restart: 'no'
+    environment:
+      NEXT_PUBLIC_API_URL: http://api-test:8000
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: test_nextauth_secret
+      NODE_ENV: test
+      CI: 'true'
+    volumes:
+      - ./apps/web:/app/web
+      - ./packages:/app/packages
+      - ./tests:/app/tests
+      - ./coverage:/app/coverage
+    networks:
+      - agentlab-test-network
+    depends_on:
+      api-test:
+        condition: service_healthy
+      web-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+      # Wait for services to be ready
+      sleep 15 &&
+      # Run unit tests
+      npm run test --workspace=apps/web &&
+      # Run integration tests
+      npm run test:integration --workspace=apps/web
+      "
+    profiles:
+      - test
+
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: ./infrastructure/docker/e2e/Dockerfile
+    container_name: agentlab-e2e-tests
+    restart: 'no'
+    environment:
+      BASE_URL: http://web-test:3000
+      API_URL: http://api-test:8000
+      HEADLESS: 'true'
+    volumes:
+      - ./tests/e2e:/app/tests
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+    networks:
+      - agentlab-test-network
+    depends_on:
+      web-test:
+        condition: service_healthy
+    command: >
+      sh -c "
+      # Wait for all services to be ready
+      sleep 20 &&
+      # Run end-to-end tests
+      npx playwright test --config=playwright.config.js
+      "
+    profiles:
+      - test

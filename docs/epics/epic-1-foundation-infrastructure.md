@@ -1,6 +1,7 @@
 # Epic 1: Foundation & Infrastructure Setup
 
 ## Epic Goal
+
 Establish the foundational development environment, infrastructure, and core project scaffolding for AgentLab, enabling subsequent feature development with a robust, scalable foundation.
 
 ## Epic Description
@@ -10,6 +11,7 @@ AgentLab is a greenfield productivity platform for DSI Product Owners managing 1
 
 **Epic Scope:**
 This epic creates the essential project foundation including:
+
 - Project initialization and repository setup with external service documentation
 - Docker-compose containerized development environment
 - Core database infrastructure (PostgreSQL + pgvector)
@@ -74,11 +76,14 @@ This epic creates the essential project foundation including:
 
 2. **Story 1.2:** Docker Infrastructure Setup with IaC
    - **Create docker-compose.yml with pinned versions:**
-     - PostgreSQL 15.4 with pgvector 0.5.0 extension
+     - PostgreSQL 15.4 with pgvector 0.5.0 extension (CANONICAL VERSION)
      - Redis 7.0-alpine for caching
      - nginx 1.25-alpine for reverse proxy
-     - Python 3.11.5-slim base image for API
-     - Node.js 18.17.0-alpine for frontend build
+     - Python 3.11.5-slim base image for API (CANONICAL VERSION)
+     - Node.js 18.17.0-alpine for frontend build (CANONICAL VERSION)
+
+     **NOTE:** These versions are the canonical specifications for Epic 1. All architecture documents should align with these versions for foundation infrastructure.
+
    - **Infrastructure as Code (IaC) implementation:**
      - Terraform modules for cloud deployment (AWS, GCP, Azure)
      - Docker Swarm compose files for production orchestration
@@ -243,6 +248,7 @@ This epic creates the essential project foundation including:
 ## Success Criteria
 
 ### Technical Requirements
+
 - [ ] Docker environment starts cleanly with `docker-compose up` in <2 minutes
 - [ ] All specified versions are pinned and validated (Node.js 18.17.0, Python 3.11.5, PostgreSQL 15.4)
 - [ ] pgvector extension loads successfully with test queries
@@ -256,6 +262,7 @@ This epic creates the essential project foundation including:
 - [ ] Mock services start and respond to test requests
 
 ### Quality Requirements
+
 - [ ] Code follows established linting standards (ESLint 8.45.0+, Prettier 3.0.0+)
 - [ ] TypeScript compilation succeeds without errors (strict mode enabled)
 - [ ] Comprehensive test suite passes with >80% coverage for critical paths
@@ -264,6 +271,7 @@ This epic creates the essential project foundation including:
 - [ ] Dependency conflicts are resolved with documented fallback procedures
 
 ### Testing Infrastructure Requirements
+
 - [ ] All testing frameworks installed and configured (pytest, Jest, Playwright)
 - [ ] Mock LLM providers respond correctly to test requests with realistic fixtures
 - [ ] Mock Claude Code MCP server simulates file sync and workflow operations
@@ -274,6 +282,7 @@ This epic creates the essential project foundation including:
 - [ ] End-to-end tests cover critical user workflows including Claude Code integration
 
 ### Deployment & Infrastructure Requirements
+
 - [ ] Terraform modules deploy infrastructure without errors
 - [ ] Blue-green deployment strategy documented and tested
 - [ ] Rollback procedures validated with test deployments
@@ -282,6 +291,7 @@ This epic creates the essential project foundation including:
 - [ ] Log aggregation and monitoring baseline established
 
 ### Dependency Management Requirements
+
 - [ ] All critical dependencies installed in specified order without conflicts
 - [ ] Version compatibility validated between Python and Node.js ecosystems
 - [ ] Fallback procedures tested for common installation failures
@@ -289,6 +299,7 @@ This epic creates the essential project foundation including:
 - [ ] Vulnerability scanning passes for all dependencies
 
 ### Integration Requirements
+
 - [ ] Frontend can communicate with backend API
 - [ ] Database connectivity confirmed
 - [ ] Authentication flow works end-to-end
@@ -296,6 +307,7 @@ This epic creates the essential project foundation including:
 - [ ] Hot reload functions in development
 
 ### CI/CD Pipeline Requirements
+
 - [ ] GitHub Actions workflows run successfully on all commits
 - [ ] Automated testing pipeline completes in < 15 minutes
 - [ ] Code quality checks pass (ESLint, Prettier, TypeScript, Black)
@@ -307,12 +319,14 @@ This epic creates the essential project foundation including:
 ## Architectural Decisions
 
 **Technology Stack:**
+
 - Backend: Python FastAPI + PostgreSQL + pgvector + Redis
 - Frontend: Next.js + TypeScript + shadcn/ui + Tailwind CSS
 - Infrastructure: Docker-compose + nginx
 - Package Management: npm workspaces
 
 **Repository Structure:**
+
 ```
 /
 ├── apps/
@@ -326,10 +340,12 @@ This epic creates the essential project foundation including:
 ```
 
 ## Dependencies
+
 - **External:** Docker, Node.js, Python 3.11+
 - **Internal:** None (foundation epic)
 
 ## Risks & Mitigation
+
 - **Risk:** Docker environment complexity
   - **Mitigation:** Comprehensive documentation and automated setup scripts
 - **Risk:** Cross-platform compatibility issues
@@ -338,6 +354,7 @@ This epic creates the essential project foundation including:
   - **Mitigation:** Pin specific versions in all configuration files
 
 ## Definition of Done
+
 - [ ] All 5 stories completed with acceptance criteria met
 - [ ] Development environment documented and validated
 - [ ] Code quality gates pass (linting, typing, testing)

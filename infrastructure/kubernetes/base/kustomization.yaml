@@ -1,0 +1,55 @@
+# Kustomization for AgentLab base Kubernetes resources
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: agentlab-base
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - redis.yaml
+  - api.yaml
+  - web.yaml
+  - nginx.yaml
+  - monitoring.yaml
+
+configMapGenerator:
+  - name: nginx-config
+    files:
+      - nginx.conf=../../nginx/nginx.conf
+  - name: nginx-agentlab-config
+    files:
+      - agentlab.conf=../../nginx/conf.d/agentlab.conf
+  - name: redis-config
+    files:
+      - redis.conf=../../redis/redis.conf
+  - name: postgres-init
+    files:
+      - 01-init-extensions.sql=../../postgres/init/01-init-extensions.sql
+
+secretGenerator:
+  - name: postgres-credentials
+    literals:
+      - username=agentlab_user
+      - password=change-me-in-production
+  - name: redis-credentials
+    literals:
+      - password=change-me-in-production
+  - name: api-secrets
+    literals:
+      - claude-api-key=change-me-in-production
+      - nextauth-secret=change-me-in-production
+
+images:
+  - name: agentlab/api
+    newTag: latest
+  - name: agentlab/web
+    newTag: latest
+
+commonLabels:
+  app.kubernetes.io/name: agentlab
+  app.kubernetes.io/version: '1.0.0'
+
+commonAnnotations:
+  description: 'AgentLab - AI Agent Development Platform'
