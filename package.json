@@ -20,15 +20,15 @@
     "prepare": "husky install"
   },
   "devDependencies": {
-    "shadcn": "^3.3.1",
-    "typescript": "^5.1.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.45.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint-config-prettier": "^9.0.0",
-    "prettier": "^3.0.0",
+    "eslint-config-prettier": "^9.1.2",
     "husky": "^8.0.0",
-    "lint-staged": "^15.0.0"
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "shadcn": "^3.3.1",
+    "typescript": "^5.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
