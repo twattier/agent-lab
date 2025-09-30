@@ -9,7 +9,7 @@ import factory
 from factory import SubFactory, LazyAttribute, LazyFunction
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.database import Client, Service, Project, ImplementationType
+from models.database import Client, Service, Project, ImplementationType, Contact, ServiceCategory
 
 
 class AsyncSQLAlchemyModelFactory(factory.Factory):
@@ -105,6 +105,41 @@ class ProjectFactory(AsyncSQLAlchemyModelFactory):
     })
     claude_code_path = factory.Faker("file_path", depth=3)
     embedding = None  # Vector field, will be set separately if needed
+    created_at = LazyFunction(datetime.utcnow)
+    updated_at = LazyFunction(datetime.utcnow)
+
+
+class ContactFactory(AsyncSQLAlchemyModelFactory):
+    """Factory for Contact model."""
+
+    class Meta:
+        model = Contact
+
+    id = LazyFunction(uuid.uuid4)
+    name = factory.Faker("name")
+    email = factory.Sequence(lambda n: f"contact{n}@example.com")
+    role = factory.Iterator([
+        "Product Manager", "Engineering Manager", "CTO",
+        "CEO", "Project Manager", "Technical Lead"
+    ])
+    phone = factory.Faker("phone_number")
+    is_active = True
+    created_at = LazyFunction(datetime.utcnow)
+    updated_at = LazyFunction(datetime.utcnow)
+
+
+class ServiceCategoryFactory(AsyncSQLAlchemyModelFactory):
+    """Factory for ServiceCategory model."""
+
+    class Meta:
+        model = ServiceCategory
+
+    id = LazyFunction(uuid.uuid4)
+    code = factory.Sequence(lambda n: f"CAT{n}")
+    name = factory.Sequence(lambda n: f"Category {n}")
+    description = factory.Faker("text", max_nb_chars=100)
+    color = factory.Iterator(["#2563eb", "#dc2626", "#059669", "#7c3aed", "#ea580c"])
+    is_active = True
     created_at = LazyFunction(datetime.utcnow)
     updated_at = LazyFunction(datetime.utcnow)
 

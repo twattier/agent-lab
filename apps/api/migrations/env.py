@@ -8,7 +8,10 @@ from alembic import context
 
 # Import our models for autogenerate support
 from core.database import Base
-from models.database import Client, Service, Project, ImplementationType
+from models.database import (
+    Client, Service, Project, ImplementationType,
+    Contact, ServiceCategory, ServiceContact, ServiceServiceCategory
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

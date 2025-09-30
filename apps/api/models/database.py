@@ -13,6 +13,8 @@ from sqlalchemy import (
     Text,
     Enum,
     JSON,
+    Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -67,7 +69,7 @@ class Service(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     client_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("clients.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
@@ -80,6 +82,12 @@ class Service(Base):
     client: Mapped["Client"] = relationship("Client", back_populates="services")
     projects: Mapped[List["Project"]] = relationship(
         "Project", back_populates="service", cascade="all, delete-orphan"
+    )
+    service_contacts: Mapped[List["ServiceContact"]] = relationship(
+        "ServiceContact", back_populates="service", cascade="all, delete-orphan"
+    )
+    category_assignments: Mapped[List["ServiceServiceCategory"]] = relationship(
+        "ServiceServiceCategory", back_populates="service", cascade="all, delete-orphan"
     )
 
 
@@ -165,3 +173,109 @@ class ImplementationType(Base):
     projects: Mapped[List["Project"]] = relationship(
         "Project", back_populates="implementation_type"
     )
+
+
+class Contact(Base):
+    """Contact model for storing contact information."""
+
+    __tablename__ = "contacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    role: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    service_contacts: Mapped[List["ServiceContact"]] = relationship(
+        "ServiceContact", back_populates="contact", cascade="all, delete-orphan"
+    )
+
+
+class ServiceCategory(Base):
+    """Reference table for service categories."""
+
+    __tablename__ = "service_categories"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)  # Hex color
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    service_assignments: Mapped[List["ServiceServiceCategory"]] = relationship(
+        "ServiceServiceCategory", back_populates="service_category", cascade="all, delete-orphan"
+    )
+
+
+class ServiceContact(Base):
+    """Junction table linking services to contacts."""
+
+    __tablename__ = "service_contacts"
+    __table_args__ = (
+        UniqueConstraint('service_id', 'contact_id', name='uq_service_contact'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    service_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("services.id", ondelete="CASCADE"), nullable=False
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
+    )
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(50), default="main", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    service: Mapped["Service"] = relationship("Service", back_populates="service_contacts")
+    contact: Mapped["Contact"] = relationship("Contact", back_populates="service_contacts")
+
+
+class ServiceServiceCategory(Base):
+    """Junction table linking services to service categories."""
+
+    __tablename__ = "service_service_categories"
+    __table_args__ = (
+        UniqueConstraint('service_id', 'service_category_id', name='uq_service_service_category'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    service_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("services.id", ondelete="CASCADE"), nullable=False
+    )
+    service_category_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("service_categories.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    service: Mapped["Service"] = relationship("Service", back_populates="category_assignments")
+    service_category: Mapped["ServiceCategory"] = relationship("ServiceCategory", back_populates="service_assignments")

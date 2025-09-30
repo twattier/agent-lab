@@ -221,3 +221,40 @@ async def test_search_clients_by_name(test_client: AsyncClient, db_session: Asyn
     names = [client["name"] for client in data["data"]]
     assert "Healthcare Corp" in names
     assert "Health Systems" in names
+
+
+@pytest.mark.asyncio
+async def test_cascade_delete_client_to_services(test_client: AsyncClient, db_session: AsyncSession):
+    """Test that deleting a client cascades to delete all its services."""
+    from tests.fixtures.factories import ServiceFactory
+
+    # Create client with services
+    client = await ClientFactory.create_async(db_session, name="Cascade Test Client")
+    service1 = await ServiceFactory.create_async(
+        db_session,
+        name="Service 1",
+        client_id=client.id
+    )
+    service2 = await ServiceFactory.create_async(
+        db_session,
+        name="Service 2",
+        client_id=client.id
+    )
+
+    # Verify services exist
+    service1_response = await test_client.get(f"/api/v1/services/{service1.id}")
+    assert service1_response.status_code == 200
+
+    service2_response = await test_client.get(f"/api/v1/services/{service2.id}")
+    assert service2_response.status_code == 200
+
+    # Delete the client
+    delete_response = await test_client.delete(f"/api/v1/clients/{client.id}")
+    assert delete_response.status_code == 200
+
+    # Verify services are also deleted (cascade delete)
+    service1_after = await test_client.get(f"/api/v1/services/{service1.id}")
+    assert service1_after.status_code == 404
+
+    service2_after = await test_client.get(f"/api/v1/services/{service2.id}")
+    assert service2_after.status_code == 404

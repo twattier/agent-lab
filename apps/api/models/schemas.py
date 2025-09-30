@@ -175,3 +175,104 @@ class HealthResponse(BaseModel):
     database: str
     service: str
     version: str
+
+
+# Contact schemas
+class ContactBase(BaseModel):
+    """Base contact schema."""
+    name: str = Field(..., min_length=1, max_length=255)
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    role: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=50)
+    is_active: bool = True
+
+
+class ContactCreate(ContactBase):
+    """Contact creation schema."""
+    pass
+
+
+class ContactUpdate(BaseModel):
+    """Contact update schema."""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    email: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    role: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+
+
+class ContactResponse(ContactBase):
+    """Contact response schema."""
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ServiceCategory schemas
+class ServiceCategoryBase(BaseModel):
+    """Base service category schema."""
+    code: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    color: Optional[str] = Field(None, pattern=r'^#[0-9a-fA-F]{6}$')
+    is_active: bool = True
+
+
+class ServiceCategoryCreate(ServiceCategoryBase):
+    """Service category creation schema."""
+    pass
+
+
+class ServiceCategoryUpdate(BaseModel):
+    """Service category update schema."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    color: Optional[str] = Field(None, pattern=r'^#[0-9a-fA-F]{6}$')
+    is_active: Optional[bool] = None
+
+
+class ServiceCategoryResponse(ServiceCategoryBase):
+    """Service category response schema."""
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ServiceContact schemas
+class ServiceContactCreate(BaseModel):
+    """Schema for assigning a contact to a service."""
+    contact_id: uuid.UUID
+    is_primary: bool = False
+    relationship_type: str = Field("main", max_length=50)
+
+
+class ServiceContactResponse(BaseModel):
+    """Service contact association response."""
+    id: uuid.UUID
+    service_id: uuid.UUID
+    contact_id: uuid.UUID
+    is_primary: bool
+    relationship_type: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ServiceServiceCategory schemas
+class ServiceCategoryAssignmentCreate(BaseModel):
+    """Schema for assigning a category to a service."""
+    service_category_id: uuid.UUID
+
+
+class ServiceCategoryAssignmentResponse(BaseModel):
+    """Service category assignment response."""
+    id: uuid.UUID
+    service_id: uuid.UUID
+    service_category_id: uuid.UUID
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

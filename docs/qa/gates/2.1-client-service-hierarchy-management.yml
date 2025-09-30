@@ -1,0 +1,173 @@
+# Quality Gate: Story 2.1 - Client & Service Hierarchy Management
+# Powered by BMAD™ Core
+
+schema: 1
+story: '2.1'
+story_title: 'Client & Service Hierarchy Management'
+gate: CONCERNS
+status_reason: 'Core implementation solid with excellent database design, but missing critical test coverage for new Contact and ServiceCategory endpoints. Pre-existing test fixture issues also need resolution.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-10-01T00:00:00Z'
+
+waiver: { active: false }
+
+top_issues:
+  - id: 'TEST-001'
+    severity: high
+    finding: 'No integration tests for new Contact endpoints (5 endpoints: POST, GET list, GET single, PUT, DELETE)'
+    suggested_action: 'Add comprehensive integration tests covering CRUD operations, email uniqueness validation, and error scenarios'
+    suggested_owner: dev
+
+  - id: 'TEST-002'
+    severity: high
+    finding: 'No integration tests for ServiceCategory assignment endpoints (4 endpoints total)'
+    suggested_action: 'Add tests for service-contact and service-category assignment/removal operations'
+    suggested_owner: dev
+
+  - id: 'TEST-003'
+    severity: medium
+    finding: "Pre-existing test fixture has 'Event loop is closed' errors affecting 9 client API tests"
+    suggested_action: 'Fix async test fixture in conftest.py - likely savepoint rollback issue with closed transactions'
+    suggested_owner: dev
+
+  - id: 'MIGRATION-001'
+    severity: medium
+    finding: 'Migration applied manually via SQL script rather than through Alembic upgrade command'
+    suggested_action: 'Document why manual approach was needed; ensure downgrade tested and reversible'
+    suggested_owner: dev
+
+  - id: 'CASCADE-001'
+    severity: low
+    finding: 'Missing Service.client_id CASCADE delete constraint in migration (present in model but migration uses manual SQL)'
+    suggested_action: 'Verify CASCADE delete works as expected with integration test'
+    suggested_owner: dev
+
+quality_score: 70
+# Calculation: 100 - (20 × 0 FAILs) - (10 × 5 CONCERNS) = 70
+
+evidence:
+  tests_reviewed: 22
+  tests_passing: 13
+  tests_failing: 9
+  risks_identified: 5
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 23, 24, 25, 26, 27, 33, 34, 35] # 15 ACs covered
+    ac_gaps: [18, 19, 20, 21, 22, 28, 29, 30, 31, 32] # 10 ACs lacking proper test validation
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Email uniqueness enforced at DB level with proper IntegrityError handling. No auth/payment concerns. Proper input validation via Pydantic schemas.'
+  performance:
+    status: PASS
+    notes: 'Repository pattern with async/await used correctly. Indexes created for all foreign keys. No N+1 query concerns identified.'
+  reliability:
+    status: CONCERNS
+    notes: 'Cascade delete properly configured in models but migration used manual SQL. Need integration test to verify behavior. Error handling is comprehensive.'
+  maintainability:
+    status: PASS
+    notes: 'Clean separation of concerns (models/schemas/repositories/endpoints). Code follows project conventions. Good docstrings present.'
+
+code_quality_assessment:
+  strengths:
+    - 'Excellent database model design with proper relationships and constraints'
+    - 'Clean repository pattern implementation with appropriate abstraction'
+    - 'Comprehensive Pydantic schemas with proper validation'
+    - 'Good error handling with appropriate HTTP status codes'
+    - 'Proper async/await usage throughout'
+    - 'Junction tables properly designed with unique constraints'
+    - '9 service categories seeded correctly'
+
+  concerns:
+    - '49% overall test coverage falls short of 80% requirement'
+    - 'New endpoints completely untested (0% coverage for contacts.py and service_categories.py routes)'
+    - 'Migration complexity suggests potential Alembic configuration issues'
+    - 'Test fixture errors indicate deeper async session management problems'
+
+architecture_compliance:
+  coding_standards: PASS
+  naming_conventions: PASS
+  error_handling_pattern: PASS
+  async_await_usage: PASS
+  type_safety: PASS
+
+acceptance_criteria_validation:
+  database_models: '7/7 ✅ All models created with proper fields and relationships'
+  api_endpoints: '22/22 ✅ All endpoints implemented (though not all tested)'
+  data_validation: '5/5 ✅ Pydantic validation comprehensive'
+  testing: '1/5 ⚠️ Unit tests pass but integration/endpoint tests missing'
+  documentation: '3/3 ✅ FastAPI autodocs, schema verified, dev notes present'
+
+recommendations:
+  immediate: # Must address before considering PASS gate
+    - action: 'Write integration tests for all Contact CRUD endpoints'
+      refs: ['apps/api/api/v1/contacts.py']
+      estimated_effort: '2-3 hours'
+
+    - action: 'Write integration tests for service-contact and service-category assignment flows'
+      refs: ['apps/api/api/v1/service_categories.py']
+      estimated_effort: '2-3 hours'
+
+    - action: 'Fix async test fixture (event loop closure issue) in conftest.py'
+      refs: ['apps/api/tests/conftest.py:67']
+      estimated_effort: '1-2 hours'
+
+    - action: 'Add integration test to verify Client cascade delete to Services'
+      refs: ['apps/api/models/database.py:26-58']
+      estimated_effort: '30 minutes'
+
+  future: # Technical debt to address in follow-up stories
+    - action: 'Investigate Alembic migration issues that required manual SQL approach'
+      refs: ['apps/api/migrations/']
+      estimated_effort: '1-2 hours'
+
+    - action: 'Consider adding rate limiting for contact creation to prevent abuse'
+      refs: ['apps/api/api/v1/contacts.py:23']
+      estimated_effort: '1 hour'
+
+    - action: 'Add API versioning examples to developer documentation'
+      refs: ['docs/']
+      estimated_effort: '30 minutes'
+
+testing_strategy_assessment:
+  unit_tests: '✅ PASS - All 10 model unit tests passing (100% coverage on models)'
+  integration_tests: '❌ FAIL - Missing tests for new endpoints, existing tests have fixture issues'
+  migration_tests: '⚠️ CONCERNS - Migration applied but not via standard Alembic workflow'
+  api_endpoint_tests: '❌ FAIL - 0% coverage on new Contact and ServiceCategory endpoints'
+  test_coverage: '❌ FAIL - 49% overall (requirement: ≥80%)'
+
+risk_summary:
+  totals:
+    critical: 0
+    high: 2
+    medium: 2
+    low: 1
+  highest: 'high'
+  recommendations:
+    must_fix:
+      - 'Add integration tests for Contact endpoints (TEST-001)'
+      - 'Add integration tests for ServiceCategory assignment endpoints (TEST-002)'
+    monitor:
+      - 'Watch for additional test fixture issues as codebase grows'
+      - 'Track test coverage metrics in CI/CD pipeline'
+
+next_steps:
+  for_developer:
+    - 'Address TEST-001 and TEST-002 (high priority)'
+    - 'Fix test fixture issue (TEST-003)'
+    - 'Achieve ≥80% test coverage before requesting re-review'
+    - 'Update File List in story with any new test files'
+
+  for_qa:
+    - 'Re-review once tests are added and coverage meets threshold'
+    - 'Validate cascade delete behavior manually if integration test not added'
+    - 'Verify all 35 acceptance criteria via manual API testing if needed'
+
+  for_product_owner:
+    - 'Story has solid technical foundation despite test gaps'
+    - 'Decision needed: Accept technical debt and move forward, or require test completion first'
+    - 'Consider: Does blocking Story 2.2+ waiting for tests delay critical path?'
+
+estimated_effort_to_pass: '5-8 hours to add comprehensive tests and fix fixtures'
+
+expires: '2025-10-15T00:00:00Z' # 2 weeks from review

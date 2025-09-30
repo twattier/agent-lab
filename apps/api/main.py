@@ -44,12 +44,14 @@ def create_app() -> FastAPI:
     )
 
     # Include API routers
-    from api.v1 import health, clients, services, projects
+    from api.v1 import health, clients, services, projects, contacts, service_categories
 
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(clients.router, prefix="/api/v1", tags=["clients"])
     app.include_router(services.router, prefix="/api/v1", tags=["services"])
     app.include_router(projects.router, prefix="/api/v1", tags=["projects"])
+    app.include_router(contacts.router, prefix="/api/v1", tags=["contacts"])
+    app.include_router(service_categories.router, prefix="/api/v1", tags=["service-categories"])
 
     return app
 

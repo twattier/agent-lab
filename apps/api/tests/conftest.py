@@ -18,35 +18,29 @@ from core.config import get_settings
 TEST_DATABASE_URL = "postgresql+asyncpg://agentlab:agentlab@localhost:5434/agentlab"
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def test_engine():
-    """Create test database engine."""
+    """Create test database engine for each test function.
+
+    Using function scope to ensure each test has its own engine in the same event loop,
+    preventing 'attached to a different loop' errors with pytest-asyncio.
+    """
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=2,  # Smaller pool for function scope
+        max_overflow=5,
         pool_pre_ping=True,
     )
 
     # Create all tables
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)  # Clean slate
         await conn.run_sync(Base.metadata.create_all)
 
     yield engine
 
-    # Drop all tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
+    # Cleanup: dispose engine to close all connections properly
     await engine.dispose()
 
 
@@ -60,11 +54,9 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     )
 
     async with async_session_maker() as session:
-        async with session.begin():
-            # Use savepoint for nested transactions
-            async with session.begin_nested() as savepoint:
-                yield session
-                await savepoint.rollback()
+        yield session
+        # Rollback any uncommitted changes
+        await session.rollback()
 
 
 @pytest.fixture
