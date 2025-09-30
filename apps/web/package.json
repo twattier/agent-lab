@@ -1,6 +1,6 @@
 {
   "name": "@agentlab/web",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,30 +8,35 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "echo \"Tests not yet implemented\" && exit 0"
+    "test": "vitest"
   },
   "dependencies": {
-    "@agentlab/types": "*",
-    "@agentlab/ui": "*",
-    "@agentlab/utils": "*",
-    "@tanstack/react-query": "^5.0.0",
-    "next": "^15.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "zustand": "^4.0.0"
+    "@radix-ui/react-slot": "^1.2.3",
+    "@tanstack/react-query": "^5.59.0",
+    "@tanstack/react-query-devtools": "^5.59.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.544.0",
+    "next": "13.4.19",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tailwind-merge": "^3.3.1",
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.45.0",
-    "@typescript-eslint/parser": "^8.45.0",
-    "autoprefixer": "^10.0.0",
-    "eslint": "^8.45.0",
-    "eslint-config-next": "^15.0.0",
-    "eslint-config-prettier": "^10.1.8",
-    "postcss": "^8.0.0",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.1.0"
-  }
+    "@types/node": "20.14.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "10.4.14",
+    "eslint": "8.45.0",
+    "eslint-config-next": "13.4.19",
+    "postcss": "8.4.27",
+    "tailwindcss": "3.3.3",
+    "typescript": "5.1.6"
+  },
+  "description": "This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).",
+  "main": "next.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

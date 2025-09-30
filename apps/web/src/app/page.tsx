@@ -1,21 +1,16 @@
-/**
- * AgentLab Homepage
- */
+import { Button } from "@/components/ui/button"
 
-export default function HomePage() {
+export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Welcome to AgentLab
-        </h1>
-        <p className="text-lg text-gray-600 mb-8">
-          AI Development Platform with BMAD Method Automation
-        </p>
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          Project scaffolding completed successfully! 🚀
-        </div>
+      <h1 className="text-4xl font-bold">AgentLab</h1>
+      <p className="mt-4 text-lg text-gray-600">
+        AI Project Management Platform
+      </p>
+      <div className="mt-8 flex gap-4">
+        <Button>Get Started</Button>
+        <Button variant="outline">Learn More</Button>
       </div>
     </main>
-  );
+  )
 }
