@@ -14,8 +14,8 @@ from core.database import Base, get_db
 from core.config import get_settings
 
 
-# Test database URL
-TEST_DATABASE_URL = "postgresql+asyncpg://agentlab:agentlab@localhost:5432/agentlab_test"
+# Test database URL - using port 5434 from docker-compose configuration
+TEST_DATABASE_URL = "postgresql+asyncpg://agentlab:agentlab@localhost:5434/agentlab"
 
 
 @pytest.fixture(scope="session")
