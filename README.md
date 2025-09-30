@@ -16,23 +16,27 @@ Before you begin, ensure you have the following installed:
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd agentlab
    ```
 
 2. **Setup environment variables**
+
    ```bash
    cp .env.example .env
    # Edit .env with your API keys and configuration
    ```
 
 3. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 4. **Start development environment**
+
    ```bash
    # Start all services (web, api, database)
    docker-compose up -d
@@ -51,6 +55,7 @@ Before you begin, ensure you have the following installed:
 AgentLab follows a **containerized modular monolith** architecture with clear separation of concerns:
 
 ### Repository Structure
+
 ```
 agentlab/
 ├── apps/                    # Application services
@@ -68,6 +73,7 @@ agentlab/
 ### Technology Stack
 
 **Frontend**
+
 - TypeScript 5.3+ with strict mode
 - Next.js 15.x with App Router
 - shadcn/ui component library
@@ -75,12 +81,14 @@ agentlab/
 - Tailwind CSS for styling
 
 **Backend**
+
 - Python 3.12 with FastAPI 0.115+
 - PostgreSQL 17.x with pgvector extension
 - Redis 7.x for caching and sessions
 - Pydantic for data validation
 
 **Development**
+
 - npm workspaces monorepo
 - ESLint + Prettier + TypeScript
 - Vitest + React Testing Library (frontend)
@@ -115,17 +123,68 @@ npm run type-check        # Check TypeScript types
 
 # Testing
 npm run test              # Run all tests
-npm run test:watch        # Run tests in watch mode
+npm run test:e2e          # Run E2E tests with Playwright
+npm run test:e2e:ui       # Run E2E tests with UI
+npm test:coverage         # Run tests with coverage reports
+
+# Environment validation
+./scripts/validate-setup.sh  # Verify development environment
+```
+
+### Testing Workflow
+
+See [Testing Guide](./docs/testing-guide.md) for comprehensive testing documentation.
+
+**Quick Commands:**
+
+```bash
+# Backend tests
+cd apps/api
+pytest                    # Run all backend tests
+pytest tests/unit/        # Run unit tests only
+pytest --cov=.           # With coverage
+
+# Frontend tests
+cd apps/web
+npx vitest run           # Run all frontend tests
+npx vitest run --coverage # With coverage
+
+# E2E tests
+npm run test:e2e         # Run Playwright tests
+npm run test:e2e:ui      # Interactive mode
+npm run test:e2e:debug   # Debug mode
+```
+
+**Coverage Requirements:**
+
+- Critical Business Logic: 95%+
+- API Endpoints: 90%+
+- UI Components: 80%+
+- Utility Functions: 100%
+
+**Test Environment:**
+
+```bash
+# Start test environment
+docker-compose -f docker-compose.test.yml up -d
+
+# Verify setup
+./scripts/validate-setup.sh
+
+# Clean test artifacts
+./scripts/test-cleanup.sh
 ```
 
 ### Git Workflow
 
 1. **Create feature branch**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 2. **Make changes with conventional commits**
+
    ```bash
    git commit -m "feat: add user authentication system"
    git commit -m "fix: resolve API validation error"
@@ -157,6 +216,7 @@ npm run test:watch        # Run tests in watch mode
    - Copy the key immediately (won't be shown again)
 
 3. **Configure Environment**
+
    ```bash
    # Add to .env file
    CLAUDE_API_KEY=your_claude_api_key_here
@@ -181,6 +241,7 @@ For fallback or testing purposes:
 For local/offline development:
 
 1. **Install OLLAMA**
+
    ```bash
    # macOS
    brew install ollama

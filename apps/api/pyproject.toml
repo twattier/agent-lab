@@ -43,6 +43,32 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
+addopts = "--cov=. --cov-report=term-missing --cov-report=html --cov-report=xml"
+markers = [
+    "unit: Unit tests for isolated components",
+    "integration: Integration tests for API endpoints",
+    "slow: Tests that take significant time to run"
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/tests/*",
+    "*/migrations/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:"
+]
 
 [tool.black]
 line-length = 88
