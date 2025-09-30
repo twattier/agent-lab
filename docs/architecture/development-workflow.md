@@ -3,14 +3,16 @@
 ## Local Development Setup
 
 ### Prerequisites
+
 ```bash
-# Install Node.js 18+ and Python 3.12+
+# Install Node.js 18+ and Python 3.11.5
 # Install Docker and Docker Compose
 # Install global dependencies
 npm install -g pnpm  # Optional: faster package manager
 ```
 
 ### Initial Setup
+
 ```bash
 # Clone repository
 git clone <repository-url>
@@ -67,6 +69,7 @@ python -m alembic upgrade head
 ### Required Environment Variables
 
 #### Frontend (.env.local)
+
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 NEXTAUTH_URL=http://localhost:3000
@@ -74,6 +77,7 @@ NEXTAUTH_SECRET=your-secret-key
 ```
 
 #### Backend (.env)
+
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/agentlab
 REDIS_URL=redis://localhost:6379
@@ -81,21 +85,25 @@ JWT_SECRET=your-jwt-secret
 ```
 
 #### OpenAI API (optional)
+
 ```bash
 OPENAI_API_KEY=your-openai-key
 ```
 
 #### OLLAMA (optional, for local LLM)
+
 ```bash
 OLLAMA_BASE_URL=http://localhost:11434
 ```
 
 #### MCP Configuration
+
 ```bash
 CLAUDE_CODE_MCP_URL=ws://localhost:3001/mcp
 ```
 
 #### Shared
+
 ```bash
 LOG_LEVEL=info
 ENVIRONMENT=development
@@ -129,4 +137,5 @@ python scripts/seed_dev_data.py
 ```
 
 ---
+
 [← Back to Project Structure](project-structure.md) | [Architecture Index](index.md) | [Next: Deployment Architecture →](deployment-architecture.md)
