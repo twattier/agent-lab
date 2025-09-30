@@ -1,0 +1,173 @@
+name: CD
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for web image
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for API image
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/api/Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  scan:
+    name: Security Scan Images
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    strategy:
+      matrix:
+        image: [web, api]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.image }}:${{ github.ref_name }}-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.image }}.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.image }}.sarif'
+          category: 'trivy-${{ matrix.image }}'
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, scan]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.agentlab.example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        run: |
+          echo "Deployment to staging would happen here"
+          echo "In production, this would SSH to staging server and run:"
+          echo "  docker-compose pull"
+          echo "  docker-compose up -d --no-deps web api"
+          echo "  docker system prune -f"
+        # Actual deployment command (commented for reference):
+        # run: |
+        #   ssh ${{ secrets.STAGING_HOST }} "
+        #     cd /opt/agentlab &&
+        #     docker-compose pull &&
+        #     docker-compose up -d --no-deps web api &&
+        #     docker system prune -f
+        #   "
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, scan]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://agentlab.example.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production server
+        run: |
+          echo "Deployment to production would happen here"
+          echo "In production, this would SSH to production server and run:"
+          echo "  docker-compose pull"
+          echo "  docker-compose up -d --no-deps web api"
+          echo "  docker system prune -f"
+        # Actual deployment command (commented for reference):
+        # run: |
+        #   ssh ${{ secrets.PRODUCTION_HOST }} "
+        #     cd /opt/agentlab &&
+        #     docker-compose pull &&
+        #     docker-compose up -d --no-deps web api &&
+        #     docker system prune -f
+        #   "
+
+      - name: Verify deployment health
+        run: |
+          echo "Health check verification would happen here"
+          echo "curl -f https://agentlab.example.com/api/v1/health || exit 1"

@@ -1,5 +1,10 @@
 # AgentLab 🤖
 
+[![CI](https://github.com/agentlab/agent-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/agentlab/agent-lab/actions/workflows/ci.yml)
+[![CD](https://github.com/agentlab/agent-lab/actions/workflows/cd.yml/badge.svg)](https://github.com/agentlab/agent-lab/actions/workflows/cd.yml)
+[![codecov](https://codecov.io/gh/agentlab/agent-lab/branch/main/graph/badge.svg)](https://codecov.io/gh/agentlab/agent-lab)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 AgentLab is a comprehensive AI development platform built with the BMAD Method automation and Claude Code integration. It provides a robust, scalable foundation for building AI-powered applications with a focus on productivity, automation, and best practices.
 
 ## 🚀 Quick Start
@@ -134,6 +139,48 @@ npm test:coverage         # Run tests with coverage reports
 ### Testing Workflow
 
 See [Testing Guide](./docs/testing-guide.md) for comprehensive testing documentation.
+
+## 🚀 CI/CD Pipeline
+
+AgentLab uses GitHub Actions for automated testing, building, and deployment.
+
+### Continuous Integration (CI)
+
+The CI pipeline runs on every push and pull request:
+
+- **Linting**: ESLint and Prettier validation
+- **Python Quality**: black, isort, flake8, mypy
+- **Backend Tests**: pytest with PostgreSQL
+- **Frontend Tests**: Vitest with React Testing Library
+- **Type Checking**: TypeScript compilation
+- **E2E Tests**: Playwright automation
+- **Security Scanning**: npm audit and Python safety
+
+**Pipeline Duration:** ~10-12 minutes
+
+### Continuous Deployment (CD)
+
+The CD pipeline handles Docker builds and deployments:
+
+1. **Build**: Multi-stage Docker images for web and API
+2. **Scan**: Trivy security scanning for vulnerabilities
+3. **Deploy Staging**: Automatic deployment on `develop` branch
+4. **Deploy Production**: Manual approval required on `main` branch
+
+**See:** [CI/CD Guide](./docs/ci-cd-guide.md) for detailed documentation.
+
+### Deployment Commands
+
+```bash
+# Deploy to staging
+./scripts/deploy.sh staging develop-abc123
+
+# Deploy to production
+./scripts/deploy.sh production main-def456
+
+# Emergency rollback
+./scripts/rollback.sh production
+```
 
 **Quick Commands:**
 
