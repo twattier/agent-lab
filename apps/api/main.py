@@ -43,8 +43,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Register exception handlers
+    from core.exceptions import register_exception_handlers
+    register_exception_handlers(app)
+
     # Include API routers
-    from api.v1 import health, clients, services, projects, contacts, service_categories, implementation_types, workflows, documents
+    from api.v1 import health, clients, services, projects, contacts, service_categories, implementation_types, workflows, documents, export, audit
 
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(clients.router, prefix="/api/v1", tags=["clients"])
@@ -55,6 +59,8 @@ def create_app() -> FastAPI:
     app.include_router(implementation_types.router, prefix="/api/v1", tags=["implementation-types"])
     app.include_router(workflows.router, prefix="/api/v1", tags=["workflows"])
     app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
+    app.include_router(export.router, prefix="/api/v1", tags=["export"])
+    app.include_router(audit.router, prefix="/api/v1", tags=["audit"])
 
     return app
 

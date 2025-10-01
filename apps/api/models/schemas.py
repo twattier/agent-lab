@@ -2,11 +2,14 @@
 Pydantic models for request/response schemas.
 """
 import uuid
+import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, EmailStr
+
+from core.sanitization import sanitize_html, sanitize_path, sanitize_markdown
 
 
 class BusinessDomain(str, Enum):
@@ -72,6 +75,12 @@ class ClientBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     business_domain: BusinessDomain
 
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
 
 class ClientCreate(ClientBase):
     """Client creation schema."""
@@ -98,6 +107,20 @@ class ServiceBase(BaseModel):
     """Base service schema."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from description."""
+        if v is None:
+            return v
+        return sanitize_html(v)
 
 
 class ServiceCreate(ServiceBase):
@@ -147,6 +170,18 @@ class ProjectBase(BaseModel):
     description: str = Field(..., min_length=1)
     project_type: ProjectType
 
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: str) -> str:
+        """Sanitize HTML/script tags from description."""
+        return sanitize_html(v)
+
 
 class ProjectCreate(ProjectBase):
     """Project creation schema."""
@@ -161,6 +196,30 @@ class ProjectUpdate(BaseModel):
     status: Optional[ProjectStatus] = None
     implementation_type_id: Optional[uuid.UUID] = None
     claude_code_path: Optional[str] = Field(None, max_length=500)
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from name."""
+        if v is None:
+            return v
+        return sanitize_html(v)
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from description."""
+        if v is None:
+            return v
+        return sanitize_html(v)
+
+    @field_validator('claude_code_path')
+    @classmethod
+    def validate_path(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize path to prevent traversal attacks."""
+        if v is None:
+            return v
+        return sanitize_path(v)
 
 
 class ProjectResponse(ProjectBase):
@@ -194,6 +253,29 @@ class ImplementationTypeBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
     is_active: bool = True
+
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        """Validate code format (uppercase alphanumeric with underscores)."""
+        v = sanitize_html(v)
+        if not re.match(r'^[A-Z0-9_]+$', v):
+            raise ValueError('Code must be uppercase alphanumeric with underscores')
+        return v
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from description."""
+        if v is None:
+            return v
+        return sanitize_html(v)
 
 
 class ImplementationTypeCreate(ImplementationTypeBase):
@@ -236,10 +318,37 @@ class HealthResponse(BaseModel):
 class ContactBase(BaseModel):
     """Base contact schema."""
     name: str = Field(..., min_length=1, max_length=255)
-    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    email: EmailStr = Field(..., max_length=255)
     role: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=50)
     is_active: bool = True
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from role."""
+        if v is None:
+            return v
+        return sanitize_html(v)
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Validate E.164 phone format."""
+        if v is None:
+            return v
+        # Remove common separators for validation
+        cleaned = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        # Validate E.164 format (optional + followed by 1-15 digits)
+        if not re.match(r'^\+?[1-9]\d{1,14}$', cleaned):
+            raise ValueError('Phone must be in valid international format (E.164)')
+        return v
 
 
 class ContactCreate(ContactBase):
@@ -250,10 +359,37 @@ class ContactCreate(ContactBase):
 class ContactUpdate(BaseModel):
     """Contact update schema."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    email: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    email: Optional[EmailStr] = Field(None, max_length=255)
     role: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from name."""
+        if v is None:
+            return v
+        return sanitize_html(v)
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from role."""
+        if v is None:
+            return v
+        return sanitize_html(v)
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Validate E.164 phone format."""
+        if v is None:
+            return v
+        cleaned = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+        if not re.match(r'^\+?[1-9]\d{1,14}$', cleaned):
+            raise ValueError('Phone must be in valid international format (E.164)')
+        return v
 
 
 class ContactResponse(ContactBase):
@@ -273,6 +409,29 @@ class ServiceCategoryBase(BaseModel):
     description: Optional[str] = None
     color: Optional[str] = Field(None, pattern=r'^#[0-9a-fA-F]{6}$')
     is_active: bool = True
+
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v: str) -> str:
+        """Validate code format (uppercase alphanumeric with underscores)."""
+        v = sanitize_html(v)
+        if not re.match(r'^[A-Z0-9_]+$', v):
+            raise ValueError('Code must be uppercase alphanumeric with underscores')
+        return v
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from description."""
+        if v is None:
+            return v
+        return sanitize_html(v)
 
 
 class ServiceCategoryCreate(ServiceCategoryBase):
@@ -418,16 +577,42 @@ class DocumentBase(BaseModel):
     language: Language = Language.ENGLISH
     documentType: DocumentType
 
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Sanitize HTML/script tags from name."""
+        return sanitize_html(v)
+
 
 class CreateDocumentRequest(DocumentBase):
     """Document creation request schema."""
     content: str = Field(..., min_length=1)
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        """Sanitize markdown content for safe rendering."""
+        return sanitize_markdown(v)
 
 
 class UpdateDocumentRequest(BaseModel):
     """Document update request schema."""
     content: str = Field(..., min_length=1)
     changeSummary: Optional[str] = None
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        """Sanitize markdown content for safe rendering."""
+        return sanitize_markdown(v)
+
+    @field_validator('changeSummary')
+    @classmethod
+    def validate_change_summary(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize HTML/script tags from change summary."""
+        if v is None:
+            return v
+        return sanitize_html(v)
 
 
 class DocumentResponse(DocumentBase):
@@ -464,6 +649,20 @@ class CreateCommentRequest(BaseModel):
     userId: uuid.UUID
     content: str = Field(..., min_length=1)
     lineNumber: Optional[int] = None
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        """Sanitize markdown content for safe rendering."""
+        return sanitize_markdown(v)
+
+    @field_validator('lineNumber')
+    @classmethod
+    def validate_line_number(cls, v: Optional[int]) -> Optional[int]:
+        """Validate line number is positive."""
+        if v is not None and v < 1:
+            raise ValueError('Line number must be positive')
+        return v
 
 
 class CommentResponse(BaseModel):
