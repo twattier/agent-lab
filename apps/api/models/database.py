@@ -46,6 +46,8 @@ class WorkflowEventType(str, enum.Enum):
     STAGE_ADVANCE = "stage_advance"
     GATE_APPROVED = "gate_approved"
     GATE_REJECTED = "gate_rejected"
+    GATE_RESET = "gate_reset"
+    REVIEWER_ASSIGNED = "reviewer_assigned"
     MANUAL_OVERRIDE = "manual_override"
 
 
@@ -536,3 +538,132 @@ class Comment(Base):
 
     # Relationships
     document: Mapped["Document"] = relationship("Document", back_populates="comments")
+
+# Story 3.1 & 3.2: Workflow and Gate Management Models
+
+class WorkflowTemplate(Base):
+    """Workflow template model for BMAD templates."""
+
+    __tablename__ = "workflow_template"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    template_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    version: Mapped[str] = mapped_column(String(20), nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    stages: Mapped[List["WorkflowStage"]] = relationship(
+        "WorkflowStage", back_populates="template", cascade="all, delete-orphan"
+    )
+    gates: Mapped[List["WorkflowGate"]] = relationship(
+        "WorkflowGate", back_populates="template", cascade="all, delete-orphan"
+    )
+
+
+class WorkflowStage(Base):
+    """Workflow stage model for BMAD stages."""
+
+    __tablename__ = "workflow_stage"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    template_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_template.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    stage_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    template: Mapped["WorkflowTemplate"] = relationship(
+        "WorkflowTemplate", back_populates="stages"
+    )
+
+
+class WorkflowGate(Base):
+    """Workflow gate model for stage transitions."""
+
+    __tablename__ = "workflow_gate"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    template_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_template.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    gate_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    stage_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    criteria: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default='pending'
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    template: Mapped["WorkflowTemplate"] = relationship(
+        "WorkflowTemplate", back_populates="gates"
+    )
+    reviewers: Mapped[List["GateReviewer"]] = relationship(
+        "GateReviewer", back_populates="gate", cascade="all, delete-orphan"
+    )
+
+
+class GateReviewer(Base):
+    """Gate reviewer assignment model."""
+
+    __tablename__ = "gate_reviewer"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    gate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_gate.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    reviewer_role: Mapped[str] = mapped_column(String(50), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    gate: Mapped["WorkflowGate"] = relationship(
+        "WorkflowGate", back_populates="reviewers"
+    )
+    contact: Mapped["Contact"] = relationship("Contact")

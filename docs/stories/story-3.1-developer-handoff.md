@@ -23,6 +23,32 @@ Implement BMAD workflow template import from filesystem and integrate external L
 
 ---
 
+## ⚠️ CRITICAL: Database Migration Prerequisite
+
+**BEFORE implementing any service code, you MUST:**
+
+1. Create database migration:
+
+   ```bash
+   alembic revision -m "story_3_1_bmad_template_tables"
+   ```
+
+2. Implement tables in migration:
+   - `workflow_template` (id, template_name, version, configuration JSONB, timestamps)
+   - `workflow_stage` (id, template_id FK, stage_id, name, sequence_number, timestamps)
+   - `workflow_gate` (id, template_id FK, gate_id, name, stage_id, criteria JSONB, timestamps)
+
+3. Validate and apply migration:
+   ```bash
+   python -m apps.api.scripts.validate_migration
+   alembic upgrade head
+   psql -U agentlab -d agentlab -c "\dt workflow_*"
+   ```
+
+**Reference:** Story document Task 2.0, Dev Notes > Database Schema for Workflow Templates
+
+---
+
 ## Key Implementation Tasks
 
 ### 1. BMAD Template Import Service
@@ -111,25 +137,25 @@ class MCPService:
 
 ```http
 POST /api/v1/bmad/templates/import
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
   "template_path": "/path/to/template.yml",
-  "validate": true
+  "strict_validation": true
 }
 ```
 
-### Test LLM Provider
+**Auth:** Requires Bearer token (NextAuth.js pattern from Epic 2)
+
+### MCP Connection Status
 
 ```http
-POST /api/v1/bmad/llm/test
-Content-Type: application/json
-
-{
-  "provider": "openai",
-  "model": "gpt-4-turbo-preview"
-}
+GET /api/v1/bmad/mcp/status
+Authorization: Bearer <token>
 ```
+
+**Auth:** Requires Bearer token (NextAuth.js pattern from Epic 2)
 
 ---
 
@@ -164,6 +190,6 @@ Content-Type: application/json
 
 ---
 
-**Created:** 2025-10-01
-**Last Updated:** 2025-10-01
+**Created:** 2025-10-01 by Bob (SM)
+**Last Updated:** 2025-10-01 by Sarah (PO) - Added database migration prerequisite and authentication requirements
 **Owner:** Developer (James)
