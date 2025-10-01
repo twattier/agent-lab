@@ -15,3 +15,9 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
 httpx>=0.25.0
 # model-context-protocol>=0.6.0  # TODO: Add when package becomes available
+
+# Epic 3 Dependencies - BMAD Workflow Integration
+mcp>=1.15.0  # Using latest stable (0.9.0 not available)
+openai==1.6.0
+anthropic==0.8.0
+pyyaml>=6.0
