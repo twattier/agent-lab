@@ -39,6 +39,14 @@ class ProjectStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
+class WorkflowEventType(str, enum.Enum):
+    """Workflow event type enumeration."""
+    STAGE_ADVANCE = "stage_advance"
+    GATE_APPROVED = "gate_approved"
+    GATE_REJECTED = "gate_rejected"
+    MANUAL_OVERRIDE = "manual_override"
+
+
 class Client(Base):
     """Client model representing DSI client organizations."""
 
@@ -149,6 +157,9 @@ class Project(Base):
     )
     user_category_assignments: Mapped[List["ProjectServiceCategory"]] = relationship(
         "ProjectServiceCategory", back_populates="project", cascade="all, delete-orphan"
+    )
+    workflow_events: Mapped[List["WorkflowEvent"]] = relationship(
+        "WorkflowEvent", back_populates="project", cascade="all, delete-orphan"
     )
 
 
@@ -341,3 +352,37 @@ class ProjectServiceCategory(Base):
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="user_category_assignments")
     service_category: Mapped["ServiceCategory"] = relationship("ServiceCategory", back_populates="project_assignments")
+
+
+class WorkflowEvent(Base):
+    """Workflow event audit trail for project workflow state changes."""
+
+    __tablename__ = "workflow_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    event_type: Mapped[WorkflowEventType] = mapped_column(
+        SQLEnum(WorkflowEventType),
+        nullable=False,
+        index=True
+    )
+    from_stage: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    to_stage: Mapped[str] = mapped_column(String(100), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    event_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default='{}')
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project", back_populates="workflow_events")

@@ -15,6 +15,7 @@ from models.database import (
     Service,
     ImplementationType,
 )
+from models.schemas import WorkflowState
 
 
 class ProjectRepository:
@@ -26,7 +27,7 @@ class ProjectRepository:
 
     async def create_project(self, data: Dict[str, Any]) -> Project:
         """
-        Create a new project.
+        Create a new project with initialized workflow state.
 
         Args:
             data: Project data dictionary
@@ -34,6 +35,17 @@ class ProjectRepository:
         Returns:
             Created Project object
         """
+        # Initialize workflow_state if not provided
+        if "workflow_state" not in data or not data["workflow_state"]:
+            initial_workflow = WorkflowState(
+                currentStage="discovery",
+                completedStages=[],
+                stageData={"template": "bmad_method"},
+                lastTransition=None,
+                gateStatus="not_required"
+            )
+            data["workflow_state"] = initial_workflow.model_dump(mode='json')
+
         project = Project(**data)
         self.db.add(project)
         await self.db.commit()
@@ -361,3 +373,52 @@ class ProjectRepository:
         await self.db.delete(assignment)
         await self.db.commit()
         return True
+
+    # Workflow State methods
+    async def update_workflow_state(
+        self, project_id: uuid.UUID, workflow_state: WorkflowState
+    ) -> Optional[Project]:
+        """
+        Update workflow state for a project with atomic operation.
+
+        Args:
+            project_id: UUID of the project
+            workflow_state: WorkflowState object to update
+
+        Returns:
+            Updated Project object or None if not found
+        """
+        project = await self.get_project_by_id(project_id, include_relations=False)
+        if not project:
+            return None
+
+        # Convert WorkflowState to dict for JSONB storage
+        project.workflow_state = workflow_state.model_dump(mode='json')
+
+        await self.db.commit()
+        await self.db.refresh(project)
+        return project
+
+    async def get_workflow_state(self, project_id: uuid.UUID) -> Optional[WorkflowState]:
+        """
+        Get workflow state from project JSONB field.
+
+        Args:
+            project_id: UUID of the project
+
+        Returns:
+            WorkflowState object or None if project not found or state not initialized
+        """
+        project = await self.get_project_by_id(project_id, include_relations=False)
+        if not project:
+            return None
+
+        workflow_data = project.workflow_state
+        if not workflow_data:
+            return None
+
+        try:
+            return WorkflowState(**workflow_data)
+        except Exception:
+            # Handle deserialization errors gracefully
+            return None

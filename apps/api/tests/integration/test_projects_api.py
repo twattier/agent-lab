@@ -111,7 +111,10 @@ async def test_create_project(test_client: AsyncClient, db_session: AsyncSession
     assert data["name"] == "New Project"
     assert data["project_type"] == "new"
     assert data["status"] == "draft"  # Default status
-    assert data["workflow_state"] == {}
+    # Workflow state is now auto-initialized (Story 2.3)
+    assert data["workflow_state"]["currentStage"] == "discovery"
+    assert data["workflow_state"]["completedStages"] == []
+    assert data["workflow_state"]["gateStatus"] == "not_required"
     assert "id" in data
     assert "created_at" in data
 

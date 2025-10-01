@@ -3,10 +3,10 @@ Pydantic models for request/response schemas.
 """
 import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class BusinessDomain(str, Enum):
@@ -33,6 +33,22 @@ class ProjectStatus(str, Enum):
     BLOCKED = "blocked"
     COMPLETED = "completed"
     ARCHIVED = "archived"
+
+
+class GateStatus(str, Enum):
+    """Gate status enumeration for workflow stages."""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    NOT_REQUIRED = "not_required"
+
+
+class WorkflowEventType(str, Enum):
+    """Workflow event type enumeration."""
+    STAGE_ADVANCE = "stage_advance"
+    GATE_APPROVED = "gate_approved"
+    GATE_REJECTED = "gate_rejected"
+    MANUAL_OVERRIDE = "manual_override"
 
 
 # Client schemas
@@ -93,10 +109,20 @@ class ServiceResponse(ServiceBase):
 # WorkflowState schema for JSONB validation
 class WorkflowState(BaseModel):
     """Workflow state schema for JSONB field."""
-    currentStage: Optional[str] = None
+    currentStage: str
     completedStages: List[str] = Field(default_factory=list)
     stageData: Dict[str, Any] = Field(default_factory=dict)
     lastTransition: Optional[datetime] = None
+    gateStatus: GateStatus = GateStatus.NOT_REQUIRED
+
+    @field_validator("completedStages")
+    @classmethod
+    def validate_no_current_in_completed(cls, v: List[str], info) -> List[str]:
+        """Validate that currentStage is not in completedStages."""
+        current_stage = info.data.get("currentStage")
+        if current_stage and current_stage in v:
+            raise ValueError("currentStage cannot be in completedStages")
+        return v
 
 
 # Project schemas
@@ -334,3 +360,37 @@ class ProjectUserCategoryResponse(BaseModel):
     service_category: Optional[ServiceCategoryResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# Workflow schemas
+class WorkflowStateResponse(WorkflowState):
+    """Workflow state response with available transitions."""
+    availableTransitions: List[str] = Field(default_factory=list)
+
+
+class WorkflowEventResponse(BaseModel):
+    """Workflow event response schema."""
+    id: uuid.UUID
+    projectId: uuid.UUID = Field(alias="project_id")
+    eventType: WorkflowEventType = Field(alias="event_type")
+    fromStage: Optional[str] = Field(None, alias="from_stage")
+    toStage: str = Field(alias="to_stage")
+    userId: uuid.UUID = Field(alias="user_id")
+    metadata: Dict[str, Any] = Field(alias="event_metadata")
+    timestamp: datetime
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class WorkflowAdvanceRequest(BaseModel):
+    """Request schema for advancing workflow stage."""
+    toStage: str = Field(..., min_length=1)
+    notes: Optional[str] = None
+    stageData: Optional[Dict[str, Any]] = None
+
+
+class GateApprovalRequest(BaseModel):
+    """Request schema for gate approval/rejection."""
+    action: Literal["approve", "reject"]
+    feedback: Optional[str] = None
+    approverId: uuid.UUID
