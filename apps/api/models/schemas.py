@@ -22,23 +22,17 @@ class BusinessDomain(str, Enum):
 
 class ProjectType(str, Enum):
     """Project type enumeration."""
-    WEB_APPLICATION = "web_application"
-    MOBILE_APP = "mobile_app"
-    API_SERVICE = "api_service"
-    DATA_PIPELINE = "data_pipeline"
-    ML_MODEL = "ml_model"
-    AUTOMATION_SCRIPT = "automation_script"
+    NEW = "new"
+    EXISTING = "existing"
 
 
 class ProjectStatus(str, Enum):
     """Project status enumeration."""
     DRAFT = "draft"
-    PLANNING = "planning"
-    IN_PROGRESS = "in_progress"
-    REVIEW = "review"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
     COMPLETED = "completed"
-    ON_HOLD = "on_hold"
-    CANCELLED = "cancelled"
+    ARCHIVED = "archived"
 
 
 # Client schemas
@@ -96,13 +90,21 @@ class ServiceResponse(ServiceBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# WorkflowState schema for JSONB validation
+class WorkflowState(BaseModel):
+    """Workflow state schema for JSONB field."""
+    currentStage: Optional[str] = None
+    completedStages: List[str] = Field(default_factory=list)
+    stageData: Dict[str, Any] = Field(default_factory=dict)
+    lastTransition: Optional[datetime] = None
+
+
 # Project schemas
 class ProjectBase(BaseModel):
     """Base project schema."""
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
+    description: str = Field(..., min_length=1)
     project_type: ProjectType
-    claude_code_path: Optional[str] = Field(None, max_length=500)
 
 
 class ProjectCreate(ProjectBase):
@@ -114,11 +116,9 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     """Project update schema."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    project_type: Optional[ProjectType] = None
-    implementation_type_id: Optional[uuid.UUID] = None
+    description: Optional[str] = Field(None, min_length=1)
     status: Optional[ProjectStatus] = None
-    workflow_state: Optional[Dict[str, Any]] = None
+    implementation_type_id: Optional[uuid.UUID] = None
     claude_code_path: Optional[str] = Field(None, max_length=500)
 
 
@@ -128,9 +128,20 @@ class ProjectResponse(ProjectBase):
     service_id: uuid.UUID
     implementation_type_id: Optional[uuid.UUID] = None
     status: ProjectStatus
-    workflow_state: Optional[Dict[str, Any]] = None
+    workflow_state: Dict[str, Any]
+    claude_code_path: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectDetailResponse(ProjectResponse):
+    """Project detail response with relationships."""
+    service: Optional['ServiceResponse'] = None
+    implementation_type: Optional['ImplementationTypeResponse'] = None
+    contacts: List['ProjectContactResponse'] = Field(default_factory=list)
+    user_categories: List['ServiceCategoryResponse'] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -138,8 +149,10 @@ class ProjectResponse(ProjectBase):
 # Implementation Type schemas
 class ImplementationTypeBase(BaseModel):
     """Base implementation type schema."""
+    code: str = Field(..., min_length=1, max_length=50)
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
+    is_active: bool = True
 
 
 class ImplementationTypeCreate(ImplementationTypeBase):
@@ -151,6 +164,7 @@ class ImplementationTypeResponse(ImplementationTypeBase):
     """Implementation type response schema."""
     id: uuid.UUID
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -274,5 +288,49 @@ class ServiceCategoryAssignmentResponse(BaseModel):
     service_id: uuid.UUID
     service_category_id: uuid.UUID
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ProjectContact schemas
+class ProjectContactCreate(BaseModel):
+    """Schema for assigning a contact to a project."""
+    contact_id: uuid.UUID
+    contact_type: str = Field("stakeholder", max_length=50)
+    is_active: bool = True
+
+
+class ProjectContactUpdate(BaseModel):
+    """Schema for updating a project-contact relationship."""
+    contact_type: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+
+
+class ProjectContactResponse(BaseModel):
+    """Project contact association response."""
+    id: uuid.UUID
+    project_id: uuid.UUID
+    contact_id: uuid.UUID
+    contact_type: str
+    is_active: bool
+    created_at: datetime
+    contact: Optional[ContactResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ProjectServiceCategory (User Category) schemas
+class ProjectUserCategoryCreate(BaseModel):
+    """Schema for assigning a user category to a project."""
+    service_category_id: uuid.UUID
+
+
+class ProjectUserCategoryResponse(BaseModel):
+    """Project user category assignment response."""
+    id: uuid.UUID
+    project_id: uuid.UUID
+    service_category_id: uuid.UUID
+    created_at: datetime
+    service_category: Optional[ServiceCategoryResponse] = None
 
     model_config = ConfigDict(from_attributes=True)

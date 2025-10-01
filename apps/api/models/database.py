@@ -1,6 +1,7 @@
 """
 SQLAlchemy database models for AgentLab.
 """
+import enum
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -11,16 +12,31 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Text,
-    Enum,
-    JSON,
+    Enum as SQLEnum,
     Boolean,
     UniqueConstraint,
+    func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 
 from core.database import Base
+
+
+class ProjectType(str, enum.Enum):
+    """Project type enumeration."""
+    NEW = "new"
+    EXISTING = "existing"
+
+
+class ProjectStatus(str, enum.Enum):
+    """Project status enumeration."""
+    DRAFT = "draft"
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
 
 
 class Client(Base):
@@ -33,7 +49,7 @@ class Client(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     business_domain: Mapped[str] = mapped_column(
-        Enum(
+        SQLEnum(
             "healthcare",
             "finance",
             "education",
@@ -92,7 +108,7 @@ class Service(Base):
 
 
 class Project(Base):
-    """Project model with BMAD workflow state and pgvector support."""
+    """Project model with BMAD workflow state and lifecycle management."""
 
     __tablename__ = "projects"
 
@@ -100,58 +116,39 @@ class Project(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
     service_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("services.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("services.id", ondelete="CASCADE"), nullable=False, index=True
     )
     project_type: Mapped[str] = mapped_column(
-        Enum(
-            "web_application",
-            "mobile_app",
-            "api_service",
-            "data_pipeline",
-            "ml_model",
-            "automation_script",
-            name="project_type_enum"
-        ),
-        nullable=False
+        SQLEnum("new", "existing", name="project_type_enum", create_type=False), nullable=False, index=True
     )
     implementation_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("implementation_types.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("implementation_types.id", ondelete="SET NULL"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(
-        Enum(
-            "draft",
-            "planning",
-            "in_progress",
-            "review",
-            "completed",
-            "on_hold",
-            "cancelled",
-            name="project_status_enum"
-        ),
-        default="draft",
-        nullable=False
+        SQLEnum("draft", "active", "blocked", "completed", "archived", name="project_status_enum", create_type=False), nullable=False, default="draft", index=True
     )
-    workflow_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    workflow_state: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default='{}')
     claude_code_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    # Vector embedding for semantic search
-    embedding: Mapped[Optional[List[float]]] = mapped_column(
-        Vector(1536), nullable=True  # OpenAI embedding dimension
-    )
-
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), insert_default=func.now(), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime(timezone=True), insert_default=func.now(), onupdate=func.now(), server_default=func.now(), nullable=False
     )
 
     # Relationships
     service: Mapped["Service"] = relationship("Service", back_populates="projects")
     implementation_type: Mapped[Optional["ImplementationType"]] = relationship(
         "ImplementationType", back_populates="projects"
+    )
+    project_contacts: Mapped[List["ProjectContact"]] = relationship(
+        "ProjectContact", back_populates="project", cascade="all, delete-orphan"
+    )
+    user_category_assignments: Mapped[List["ProjectServiceCategory"]] = relationship(
+        "ProjectServiceCategory", back_populates="project", cascade="all, delete-orphan"
     )
 
 
@@ -163,10 +160,15 @@ class ImplementationType(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     # Relationships
@@ -199,6 +201,9 @@ class Contact(Base):
     service_contacts: Mapped[List["ServiceContact"]] = relationship(
         "ServiceContact", back_populates="contact", cascade="all, delete-orphan"
     )
+    project_contacts: Mapped[List["ProjectContact"]] = relationship(
+        "ProjectContact", back_populates="contact", cascade="all, delete-orphan"
+    )
 
 
 class ServiceCategory(Base):
@@ -224,6 +229,9 @@ class ServiceCategory(Base):
     # Relationships
     service_assignments: Mapped[List["ServiceServiceCategory"]] = relationship(
         "ServiceServiceCategory", back_populates="service_category", cascade="all, delete-orphan"
+    )
+    project_assignments: Mapped[List["ProjectServiceCategory"]] = relationship(
+        "ProjectServiceCategory", back_populates="service_category", cascade="all, delete-orphan"
     )
 
 
@@ -279,3 +287,57 @@ class ServiceServiceCategory(Base):
     # Relationships
     service: Mapped["Service"] = relationship("Service", back_populates="category_assignments")
     service_category: Mapped["ServiceCategory"] = relationship("ServiceCategory", back_populates="service_assignments")
+
+
+class ProjectContact(Base):
+    """Junction table linking projects to contacts."""
+
+    __tablename__ = "project_contacts"
+    __table_args__ = (
+        UniqueConstraint('project_id', 'contact_id', 'contact_type', name='uq_project_contact'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    contact_type: Mapped[str] = mapped_column(String(50), nullable=False, default="stakeholder")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project", back_populates="project_contacts")
+    contact: Mapped["Contact"] = relationship("Contact", back_populates="project_contacts")
+
+
+class ProjectServiceCategory(Base):
+    """Junction table linking projects to service categories (target user categories)."""
+
+    __tablename__ = "project_service_categories"
+    __table_args__ = (
+        UniqueConstraint('project_id', 'service_category_id', name='uq_project_service_category'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    service_category_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("service_categories.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project", back_populates="user_category_assignments")
+    service_category: Mapped["ServiceCategory"] = relationship("ServiceCategory", back_populates="project_assignments")

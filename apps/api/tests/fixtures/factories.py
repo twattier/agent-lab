@@ -74,12 +74,15 @@ class ImplementationTypeFactory(AsyncSQLAlchemyModelFactory):
         model = ImplementationType
 
     id = LazyFunction(uuid.uuid4)
+    code = factory.Sequence(lambda n: f"impl_type_{n}")
     name = factory.Iterator([
         "Custom Development", "Framework Integration", "API Development",
         "Database Design", "Frontend Development", "DevOps Setup"
     ])
     description = factory.Faker("text", max_nb_chars=100)
+    is_active = True
     created_at = LazyFunction(datetime.utcnow)
+    updated_at = LazyFunction(datetime.utcnow)
 
 
 class ProjectFactory(AsyncSQLAlchemyModelFactory):
@@ -92,19 +95,15 @@ class ProjectFactory(AsyncSQLAlchemyModelFactory):
     name = factory.Sequence(lambda n: f"Project {n}")
     description = factory.Faker("text", max_nb_chars=300)
     service_id = LazyFunction(uuid.uuid4)  # Will be overridden with real service
-    project_type = factory.Iterator([
-        "web_application", "mobile_app", "api_service",
-        "data_pipeline", "ml_model", "automation_script"
-    ])
+    project_type = factory.Iterator(["new", "existing"])  # Updated to match database enum
     implementation_type_id = None  # Optional field
-    status = "draft"
+    status = factory.Iterator(["draft", "active", "blocked", "completed", "archived"])
     workflow_state = factory.LazyAttribute(lambda obj: {
         "phase": "initial",
         "progress": 0,
         "last_updated": datetime.utcnow().isoformat()
     })
-    claude_code_path = factory.Faker("file_path", depth=3)
-    embedding = None  # Vector field, will be set separately if needed
+    claude_code_path = None  # Optional field
     created_at = LazyFunction(datetime.utcnow)
     updated_at = LazyFunction(datetime.utcnow)
 
