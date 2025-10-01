@@ -458,29 +458,31 @@ class TestCompleteWorkflowProgression:
     ):
         """Test progressing through entire BMAD workflow."""
         stages = [
-            ("market_research", False),
-            ("prd_creation", True),
-            ("architecture", True),
-            ("development", True),
-            ("qa_review", True),
-            ("deployment", False),
-            ("production_monitoring", False),
+            "market_research",
+            "prd_creation",
+            "architecture",
+            "development",
+            "qa_review",
+            "deployment",
+            "production_monitoring",
         ]
 
-        for stage, requires_gate in stages:
-            # Approve gate if needed before advancing
-            if requires_gate:
-                current_response = await test_client.get(
-                    f"/api/v1/projects/{test_project_data.id}/workflow"
+        for stage in stages:
+            # Check current gate status and approve if pending
+            current_response = await test_client.get(
+                f"/api/v1/projects/{test_project_data.id}/workflow"
+            )
+            current_data = current_response.json()
+
+            # If gate is pending, approve it before attempting to advance
+            if current_data.get("gateStatus") == "pending":
+                await test_client.post(
+                    f"/api/v1/projects/{test_project_data.id}/workflow/gate-approval",
+                    json={
+                        "action": "approve",
+                        "approverId": str(uuid.uuid4())
+                    }
                 )
-                if current_response.json()["gateStatus"] == "pending":
-                    await test_client.post(
-                        f"/api/v1/projects/{test_project_data.id}/workflow/gate-approval",
-                        json={
-                            "action": "approve",
-                            "approverId": str(uuid.uuid4())
-                        }
-                    )
 
             # Advance to stage
             response = await test_client.post(
@@ -501,6 +503,68 @@ class TestCompleteWorkflowProgression:
         assert final_data["currentStage"] == "production_monitoring"
         assert len(final_data["completedStages"]) == 7
         assert final_data["availableTransitions"] == []
+
+    async def test_rapid_gate_approval_and_advance(
+        self,
+        test_client: AsyncClient,
+        test_project_data,
+        db_session: AsyncSession
+    ):
+        """
+        Regression test for gate timing race condition.
+
+        This test ensures that the gate approval and stage advance logic
+        properly handles the case where a stage requires gate approval
+        before advancing to the next stage. Previously, the test logic
+        incorrectly assumed certain stages didn't require gate approval,
+        leading to failures when advancing from stages with gate_required=True.
+
+        See: Story 3.0 AC1 - Gate Timing Logic Fix
+        """
+        # Advance to prd_creation (which has gate_required=True)
+        response = await test_client.post(
+            f"/api/v1/projects/{test_project_data.id}/workflow/advance",
+            json={"toStage": "market_research"}
+        )
+        assert response.status_code == 200
+
+        response = await test_client.post(
+            f"/api/v1/projects/{test_project_data.id}/workflow/advance",
+            json={"toStage": "prd_creation"}
+        )
+        assert response.status_code == 200
+
+        # Check that gate is now pending (prd_creation has gate_required=True)
+        workflow_response = await test_client.get(
+            f"/api/v1/projects/{test_project_data.id}/workflow"
+        )
+        assert workflow_response.json()["gateStatus"] == "pending"
+
+        # Attempt to advance without approving gate (should fail)
+        response = await test_client.post(
+            f"/api/v1/projects/{test_project_data.id}/workflow/advance",
+            json={"toStage": "architecture"}
+        )
+        assert response.status_code == 400
+        assert "gate approval required" in response.json()["detail"]
+
+        # Approve gate
+        approve_response = await test_client.post(
+            f"/api/v1/projects/{test_project_data.id}/workflow/gate-approval",
+            json={
+                "action": "approve",
+                "approverId": str(uuid.uuid4())
+            }
+        )
+        assert approve_response.status_code == 200
+
+        # Now advance should succeed
+        response = await test_client.post(
+            f"/api/v1/projects/{test_project_data.id}/workflow/advance",
+            json={"toStage": "architecture"}
+        )
+        assert response.status_code == 200
+        assert response.json()["currentStage"] == "architecture"
 
 
 class TestWorkflowEventCascadeDelete:

@@ -1,0 +1,97 @@
+name: Validate Migrations
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/migrations/**'
+      - 'apps/api/models/**'
+      - 'apps/api/scripts/validate_migrations.py'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/api/migrations/**'
+
+jobs:
+  validate:
+    name: Validate Alembic Migrations
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: agentlab
+          POSTGRES_PASSWORD: agentlab
+          POSTGRES_DB: agentlab
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.5'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Alembic Migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://agentlab:agentlab@localhost:5434/agentlab
+        run: |
+          alembic upgrade head
+
+      - name: Validate Migration Consistency
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://agentlab:agentlab@localhost:5434/agentlab
+        run: |
+          python3 scripts/validate_migrations.py
+
+      - name: Check for Migration Branching
+        working-directory: apps/api
+        run: |
+          HEADS=$(alembic heads | grep -v "INFO" | wc -l)
+          if [ "$HEADS" -gt 1 ]; then
+            echo "❌ ERROR: Multiple head revisions detected!"
+            echo "Run 'alembic merge' to resolve branching."
+            exit 1
+          fi
+          echo "✅ Single head revision confirmed"
+
+      - name: Validate Down/Up Migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://agentlab:agentlab@localhost:5434/agentlab
+        run: |
+          # Test downgrade one step
+          echo "Testing downgrade..."
+          CURRENT=$(alembic current | head -1 | awk '{print $1}')
+          alembic downgrade -1 || echo "Downgrade not applicable (at base)"
+
+          # Test upgrade back to head
+          echo "Testing upgrade..."
+          alembic upgrade head
+
+          # Verify we're back at head
+          NEW_CURRENT=$(alembic current | head -1 | awk '{print $1}')
+          if [ "$NEW_CURRENT" != "$CURRENT" ] && [ -n "$CURRENT" ]; then
+            echo "❌ ERROR: Migration mismatch after down/up cycle"
+            exit 1
+          fi
+          echo "✅ Down/up migration cycle successful"

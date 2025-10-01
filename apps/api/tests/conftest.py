@@ -60,6 +60,12 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest.fixture
+async def test_session(db_session: AsyncSession) -> AsyncGenerator[AsyncSession, None]:
+    """Alias for db_session for backward compatibility with Story 2.4 tests."""
+    yield db_session
+
+
+@pytest.fixture
 def override_get_db(db_session: AsyncSession):
     """Override the get_db dependency for tests."""
     async def _override_get_db():
@@ -92,3 +98,47 @@ def test_settings():
     settings.DEBUG = True
     settings.MCP_ENABLED = False  # Disable MCP for tests
     return settings
+
+
+# Shared test data fixtures
+@pytest.fixture
+async def test_client_data(db_session: AsyncSession):
+    """Create test client."""
+    from repositories.client_repository import ClientRepository
+
+    client_repo = ClientRepository(db_session)
+    client = await client_repo.create(
+        name="Test Client",
+        business_domain="technology"
+    )
+    return client
+
+
+@pytest.fixture
+async def test_service_data(db_session: AsyncSession, test_client_data):
+    """Create test service."""
+    from repositories.service_repository import ServiceRepository
+
+    service_repo = ServiceRepository(db_session)
+    service = await service_repo.create(
+        name="Test Service",
+        description="Test service description",
+        client_id=test_client_data.id
+    )
+    return service
+
+
+@pytest.fixture
+async def test_project_data(db_session: AsyncSession, test_service_data):
+    """Create test project with initialized workflow."""
+    from repositories.project_repository import ProjectRepository
+
+    project_repo = ProjectRepository(db_session)
+    project = await project_repo.create_project({
+        "name": "Test Project",
+        "description": "Test project description",
+        "service_id": test_service_data.id,
+        "project_type": "new",
+        "status": "active"
+    })
+    return project

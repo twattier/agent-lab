@@ -16,6 +16,7 @@ from sqlalchemy import (
     Boolean,
     Integer,
     UniqueConstraint,
+    Index,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -411,6 +412,16 @@ class Document(Base):
     """Document model with version tracking and semantic search."""
 
     __tablename__ = "document"
+
+    __table_args__ = (
+        Index(
+            'idx_document_vector',
+            'content_vector',
+            postgresql_using='ivfflat',
+            postgresql_with={'lists': 100},
+            postgresql_ops={'content_vector': 'vector_cosine_ops'}
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
