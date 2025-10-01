@@ -14,6 +14,7 @@ from sqlalchemy import (
     Text,
     Enum as SQLEnum,
     Boolean,
+    Integer,
     UniqueConstraint,
     func,
 )
@@ -45,6 +46,21 @@ class WorkflowEventType(str, enum.Enum):
     GATE_APPROVED = "gate_approved"
     GATE_REJECTED = "gate_rejected"
     MANUAL_OVERRIDE = "manual_override"
+
+
+class Language(str, enum.Enum):
+    """Language enumeration for documents."""
+    FRENCH = "fr"
+    ENGLISH = "en"
+
+
+class DocumentType(str, enum.Enum):
+    """Document type enumeration."""
+    PRD = "prd"
+    ARCHITECTURE = "architecture"
+    REQUIREMENTS = "requirements"
+    FEEDBACK = "feedback"
+    OTHER = "other"
 
 
 class Client(Base):
@@ -160,6 +176,9 @@ class Project(Base):
     )
     workflow_events: Mapped[List["WorkflowEvent"]] = relationship(
         "WorkflowEvent", back_populates="project", cascade="all, delete-orphan"
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        "Document", back_populates="project", cascade="all, delete-orphan"
     )
 
 
@@ -386,3 +405,123 @@ class WorkflowEvent(Base):
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="workflow_events")
+
+
+class Document(Base):
+    """Document model with version tracking and semantic search."""
+
+    __tablename__ = "document"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    language: Mapped[Language] = mapped_column(
+        SQLEnum(Language),
+        nullable=False,
+        default=Language.ENGLISH,
+        index=True
+    )
+    document_type: Mapped[DocumentType] = mapped_column(
+        SQLEnum(DocumentType),
+        nullable=False,
+        index=True
+    )
+    content_vector: Mapped[Optional[str]] = mapped_column(Vector(1536), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project", back_populates="documents")
+    versions: Mapped[List["DocumentVersion"]] = relationship(
+        "DocumentVersion",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
+    comments: Mapped[List["Comment"]] = relationship(
+        "Comment",
+        back_populates="document",
+        cascade="all, delete-orphan"
+    )
+
+
+class DocumentVersion(Base):
+    """Document version history model."""
+
+    __tablename__ = "document_version"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("document.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    change_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True
+    )
+
+    # Relationships
+    document: Mapped["Document"] = relationship("Document", back_populates="versions")
+
+
+class Comment(Base):
+    """Comment model for document feedback and discussions."""
+
+    __tablename__ = "comment"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("document.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    line_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False
+    )
+
+    # Relationships
+    document: Mapped["Document"] = relationship("Document", back_populates="comments")

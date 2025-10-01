@@ -9,7 +9,11 @@ import factory
 from factory import SubFactory, LazyAttribute, LazyFunction
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.database import Client, Service, Project, ImplementationType, Contact, ServiceCategory
+from models.database import (
+    Client, Service, Project, ImplementationType, Contact, ServiceCategory,
+    Document, DocumentVersion, Comment, Language, DocumentType
+)
+from core.document_utils import generate_content_hash
 
 
 class AsyncSQLAlchemyModelFactory(factory.Factory):
@@ -217,3 +221,57 @@ async def create_full_hierarchy(
             all_projects.append(project)
 
     return client, services, all_projects
+
+
+class DocumentFactory(AsyncSQLAlchemyModelFactory):
+    """Factory for Document model."""
+
+    class Meta:
+        model = Document
+
+    id = LazyFunction(uuid.uuid4)
+    project_id = LazyFunction(uuid.uuid4)  # Will be overridden with real project
+    name = factory.Sequence(lambda n: f"Document {n}")
+    content = factory.Faker("text", max_nb_chars=500)
+    content_hash = LazyAttribute(lambda obj: generate_content_hash(obj.content))
+    version = 1
+    language = Language.ENGLISH
+    document_type = factory.Iterator([
+        DocumentType.PRD, DocumentType.ARCHITECTURE, DocumentType.REQUIREMENTS,
+        DocumentType.FEEDBACK, DocumentType.OTHER
+    ])
+    content_vector = None  # Embeddings not generated in tests by default
+    created_at = LazyFunction(datetime.utcnow)
+    updated_at = LazyFunction(datetime.utcnow)
+
+
+class DocumentVersionFactory(AsyncSQLAlchemyModelFactory):
+    """Factory for DocumentVersion model."""
+
+    class Meta:
+        model = DocumentVersion
+
+    id = LazyFunction(uuid.uuid4)
+    document_id = LazyFunction(uuid.uuid4)  # Will be overridden with real document
+    version = 1
+    content = factory.Faker("text", max_nb_chars=500)
+    content_hash = LazyAttribute(lambda obj: generate_content_hash(obj.content))
+    change_summary = factory.Faker("sentence")
+    created_by = LazyFunction(uuid.uuid4)
+    created_at = LazyFunction(datetime.utcnow)
+
+
+class CommentFactory(AsyncSQLAlchemyModelFactory):
+    """Factory for Comment model."""
+
+    class Meta:
+        model = Comment
+
+    id = LazyFunction(uuid.uuid4)
+    document_id = LazyFunction(uuid.uuid4)  # Will be overridden with real document
+    user_id = LazyFunction(uuid.uuid4)
+    content = factory.Faker("sentence")
+    line_number = None  # Optional field
+    resolved = False
+    created_at = LazyFunction(datetime.utcnow)
+    updated_at = LazyFunction(datetime.utcnow)

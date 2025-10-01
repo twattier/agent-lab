@@ -51,6 +51,21 @@ class WorkflowEventType(str, Enum):
     MANUAL_OVERRIDE = "manual_override"
 
 
+class Language(str, Enum):
+    """Language enumeration for documents."""
+    FRENCH = "fr"
+    ENGLISH = "en"
+
+
+class DocumentType(str, Enum):
+    """Document type enumeration."""
+    PRD = "prd"
+    ARCHITECTURE = "architecture"
+    REQUIREMENTS = "requirements"
+    FEEDBACK = "feedback"
+    OTHER = "other"
+
+
 # Client schemas
 class ClientBase(BaseModel):
     """Base client schema."""
@@ -394,3 +409,72 @@ class GateApprovalRequest(BaseModel):
     action: Literal["approve", "reject"]
     feedback: Optional[str] = None
     approverId: uuid.UUID
+
+
+# Document schemas
+class DocumentBase(BaseModel):
+    """Base document schema."""
+    name: str = Field(..., min_length=1, max_length=255)
+    language: Language = Language.ENGLISH
+    documentType: DocumentType
+
+
+class CreateDocumentRequest(DocumentBase):
+    """Document creation request schema."""
+    content: str = Field(..., min_length=1)
+
+
+class UpdateDocumentRequest(BaseModel):
+    """Document update request schema."""
+    content: str = Field(..., min_length=1)
+    changeSummary: Optional[str] = None
+
+
+class DocumentResponse(DocumentBase):
+    """Document response schema."""
+    id: uuid.UUID
+    projectId: uuid.UUID = Field(alias="project_id")
+    content: str
+    contentHash: str = Field(alias="content_hash")
+    version: int
+    createdAt: datetime = Field(alias="created_at")
+    updatedAt: datetime = Field(alias="updated_at")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+# DocumentVersion schemas
+class DocumentVersionResponse(BaseModel):
+    """Document version response schema."""
+    id: uuid.UUID
+    documentId: uuid.UUID = Field(alias="document_id")
+    version: int
+    content: str
+    contentHash: str = Field(alias="content_hash")
+    changeSummary: Optional[str] = Field(None, alias="change_summary")
+    createdBy: uuid.UUID = Field(alias="created_by")
+    createdAt: datetime = Field(alias="created_at")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+# Comment schemas
+class CreateCommentRequest(BaseModel):
+    """Comment creation request schema."""
+    userId: uuid.UUID
+    content: str = Field(..., min_length=1)
+    lineNumber: Optional[int] = None
+
+
+class CommentResponse(BaseModel):
+    """Comment response schema."""
+    id: uuid.UUID
+    documentId: uuid.UUID = Field(alias="document_id")
+    userId: uuid.UUID = Field(alias="user_id")
+    content: str
+    lineNumber: Optional[int] = Field(None, alias="line_number")
+    resolved: bool
+    createdAt: datetime = Field(alias="created_at")
+    updatedAt: datetime = Field(alias="updated_at")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)

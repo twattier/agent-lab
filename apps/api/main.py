@@ -44,7 +44,7 @@ def create_app() -> FastAPI:
     )
 
     # Include API routers
-    from api.v1 import health, clients, services, projects, contacts, service_categories, implementation_types, workflows
+    from api.v1 import health, clients, services, projects, contacts, service_categories, implementation_types, workflows, documents
 
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(clients.router, prefix="/api/v1", tags=["clients"])
@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(service_categories.router, prefix="/api/v1", tags=["service-categories"])
     app.include_router(implementation_types.router, prefix="/api/v1", tags=["implementation-types"])
     app.include_router(workflows.router, prefix="/api/v1", tags=["workflows"])
+    app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
 
     return app
 
